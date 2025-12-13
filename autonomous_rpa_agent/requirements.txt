@@ -1,0 +1,9 @@
+langgraph
+langchain-google-genai
+gradio
+selenium
+pyautogui
+pillow
+mss
+python-dotenv
+webdriver-manager

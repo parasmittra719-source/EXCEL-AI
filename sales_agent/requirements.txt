@@ -1,0 +1,7 @@
+ddgs
+requests
+beautifulsoup4
+pandas
+streamlit
+textblob
+fpdf
