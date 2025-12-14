@@ -19,6 +19,8 @@ function App() {
   const [forecast, setForecast] = useState<number[]>([]);
   const [token, setToken] = useState("");
   const [insight, setInsight] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [org, setOrg] = useState("");
   const [role, setRole] = useState("");
 
@@ -28,17 +30,20 @@ function App() {
   };
 
   const doLogin = async () => {
-    const res = await axios.post("http://127.0.0.1:8000/login", {
-      username: "admin",
-      password: "admin"
-    });
-    setToken(res.data.token);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/login", {
+        username: username,
+        password: password
+      });
+      setToken(res.data.token);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
 
-    // Decode token to get Org/Role (using simple base64 decode for demo)
-    const payload = JSON.parse(atob(res.data.token.split('.')[1]));
-    setOrg(payload.org_name);
-    setRole(payload.role);
+      const payload = JSON.parse(atob(res.data.token.split('.')[1]));
+      setOrg(payload.org_name);
+      setRole(payload.role);
+    } catch (e) {
+      alert("Login failed! Check credentials or server.");
+    }
   };
 
   const sendEmail = async () => {
@@ -108,15 +113,15 @@ function App() {
           <div className="mt-8 space-y-6">
             <input
               type="text"
-              readOnly
-              value="admin"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 focus:outline-none cursor-not-allowed"
+              placeholder="Username"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={e => setUsername(e.target.value)}
             />
             <input
               type="password"
-              readOnly
-              value="admin"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 focus:outline-none cursor-not-allowed"
+              placeholder="Password"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={e => setPassword(e.target.value)}
             />
             <button
               onClick={doLogin}
