@@ -23,20 +23,40 @@ def health():
 
 @app.post("/forecast")
 def forecast(data: dict):
-    df = pd.DataFrame(data["rows"])
-    target = data["target"]
+    try:
+        df = pd.DataFrame(data["rows"])
+        target = data["target"]
 
-    df["index"] = range(len(df))
-    X = df[["index"]]
-    y = df[target]
+        if target not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Target column '{target}' not found in dataset.")
 
-    model = LinearRegression()
-    model.fit(X, y)
+        # Basic data validation
+        if not pd.api.types.is_numeric_dtype(df[target]):
+             raise HTTPException(status_code=400, detail=f"Target column '{target}' must contain numeric values.")
 
-    future = [[i] for i in range(len(df), len(df)+6)]
-    preds = model.predict(future)
+        df["index"] = range(len(df))
+        X = df[["index"]]
+        y = df[target]
+        
+        # Handle NaN values
+        if df[target].isnull().any():
+             df = df.dropna(subset=[target])
+             X = df[["index"]]
+             y = df[target]
 
-    return {"forecast": preds.tolist()}
+        if len(df) < 2:
+             raise HTTPException(status_code=400, detail="Not enough data points to forecast (need at least 2).")
+
+        model = LinearRegression()
+        model.fit(X, y)
+
+        future = [[i] for i in range(len(df), len(df)+6)]
+        preds = model.predict(future)
+
+        return {"forecast": preds.tolist()}
+    except Exception as e:
+        print(f"Forecast Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/login")
 def login_api(payload: dict):

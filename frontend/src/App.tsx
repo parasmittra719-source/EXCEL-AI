@@ -102,15 +102,21 @@ function App() {
       return;
     }
 
+    if (!rows.length) {
+      alert("No data uploaded.");
+      return;
+    }
+
     try {
       const res = await axios.post(`${API_BASE_URL}/forecast`, {
         rows,
         target
       });
       setForecast(res.data.forecast);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Forecast generation failed. Check console for details.");
+      const msg = e.response?.data?.detail || e.message || "Unknown error";
+      alert(`Forecast failed: ${msg}`);
     }
   };
 
