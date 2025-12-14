@@ -12,6 +12,9 @@ import { Line } from "react-chartjs-2";
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement);
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000";
+const WS_BASE_URL = API_BASE_URL.replace(/^http/, "ws");
+
 function App() {
   const [rows, setRows] = useState<any[]>([]);
   const [cols, setCols] = useState<string[]>([]);
@@ -25,13 +28,13 @@ function App() {
   const [role, setRole] = useState("");
 
   const askAI = async () => {
-    const res = await axios.post("http://127.0.0.1:8000/insight", { data: rows });
+    const res = await axios.post(`${API_BASE_URL}/insight`, { data: rows });
     setInsight(res.data.insight);
   };
 
   const doLogin = async () => {
     try {
-      const res = await axios.post("http://127.0.0.1:8000/login", {
+      const res = await axios.post(`${API_BASE_URL}/login`, {
         username: username,
         password: password
       });
@@ -48,7 +51,7 @@ function App() {
 
   const sendEmail = async () => {
     try {
-      await axios.post("http://127.0.0.1:8000/email-report", {
+      await axios.post(`${API_BASE_URL}/email-report`, {
         email: "test@example.com",
         content: insight || "No insight generated yet."
       });
@@ -64,7 +67,7 @@ function App() {
     if (!rows.length || !target) return;
 
     console.log("Connecting to WebSocket...");
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+    const ws = new WebSocket(`${WS_BASE_URL}/ws`);
 
     ws.onmessage = (event) => {
       if (event.data === "refresh") {
@@ -100,7 +103,7 @@ function App() {
     }
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/forecast", {
+      const res = await axios.post(`${API_BASE_URL}/forecast`, {
         rows,
         target
       });
