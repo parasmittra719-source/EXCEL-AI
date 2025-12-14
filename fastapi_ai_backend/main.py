@@ -1,9 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from auth import login
 from ai import generate_insight
+from emailer import send_report
 
 app = FastAPI()
 
@@ -43,3 +45,15 @@ def login_api(payload: dict):
 @app.post("/insight")
 def insight(payload: dict):
     return {"insight": generate_insight(payload["data"])}
+
+@app.post("/email-report")
+async def email_report(payload: dict):
+    await send_report(payload["email"], payload["content"])
+    return {"status": "sent"}
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        await asyncio.sleep(10) # Push refresh every 10s
+        await websocket.send_text("refresh")

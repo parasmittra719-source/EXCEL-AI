@@ -8,3 +8,5 @@ passlib[bcrypt]
 openai
 psycopg2-binary
 sqlalchemy
+fastapi-mail
+websockets

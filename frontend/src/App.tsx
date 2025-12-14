@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import {
@@ -19,6 +19,8 @@ function App() {
   const [forecast, setForecast] = useState<number[]>([]);
   const [token, setToken] = useState("");
   const [insight, setInsight] = useState("");
+  const [org, setOrg] = useState("");
+  const [role, setRole] = useState("");
 
   const askAI = async () => {
     const res = await axios.post("http://127.0.0.1:8000/insight", { data: rows });
@@ -32,7 +34,47 @@ function App() {
     });
     setToken(res.data.token);
     axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
+
+    // Decode token to get Org/Role (using simple base64 decode for demo)
+    const payload = JSON.parse(atob(res.data.token.split('.')[1]));
+    setOrg(payload.org_name);
+    setRole(payload.role);
   };
+
+  const sendEmail = async () => {
+    try {
+      await axios.post("http://127.0.0.1:8000/email-report", {
+        email: "test@example.com",
+        content: insight || "No insight generated yet."
+      });
+      alert("Email sent!");
+    } catch (e) {
+      alert("Error sending email");
+    }
+  };
+
+  // Real-time Refresh via Websocket
+  useEffect(() => {
+    // Only connect if we have data to refresh
+    if (!rows.length || !target) return;
+
+    console.log("Connecting to WebSocket...");
+    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+
+    ws.onmessage = (event) => {
+      if (event.data === "refresh") {
+        console.log("Received refresh signal via WS");
+        runForecast();
+      }
+    };
+
+    ws.onerror = (e) => console.error("WS Error:", e);
+
+    return () => {
+      console.log("Closing WebSocket...");
+      ws.close();
+    };
+  }, [rows, target]); // Re-connect if data changes (simple approach)
 
   const upload = (e: any) => {
     const reader = new FileReader();
@@ -58,12 +100,18 @@ function App() {
     <div style={{ padding: 20 }}>
       <h2>AI Analytics Dashboard</h2>
       {!token && <button onClick={doLogin}>Login</button>}
+      {token && (
+        <p className="text-sm text-gray-500" style={{ color: "gray", fontSize: "0.9em" }}>
+          Org: {org} | Role: {role}
+        </p>
+      )}
       <br /><br />
       <input type="file" onChange={upload} />
       <br /><br />
       {rows.length > 0 && (
         <>
           <button onClick={askAI}>Get AI Insight</button>
+          <button onClick={sendEmail} style={{ marginLeft: 10, background: "green", color: "white" }}>Email Report</button>
           <pre>{insight}</pre>
           <br /><br />
         </>
