@@ -15,6 +15,8 @@ ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement);
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000";
 const WS_BASE_URL = API_BASE_URL.replace(/^http/, "ws");
 
+console.log("Current API Config:", { API_BASE_URL, WS_BASE_URL });
+
 function App() {
   const [rows, setRows] = useState<any[]>([]);
   const [cols, setCols] = useState<string[]>([]);
