@@ -94,11 +94,21 @@ function App() {
   };
 
   const runForecast = async () => {
-    const res = await axios.post("http://127.0.0.1:8000/forecast", {
-      rows,
-      target
-    });
-    setForecast(res.data.forecast);
+    if (!target || target === "Select Metric") {
+      alert("Please select a valid Target Metric column.");
+      return;
+    }
+
+    try {
+      const res = await axios.post("http://127.0.0.1:8000/forecast", {
+        rows,
+        target
+      });
+      setForecast(res.data.forecast);
+    } catch (e) {
+      console.error(e);
+      alert("Forecast generation failed. Check console for details.");
+    }
   };
 
 
