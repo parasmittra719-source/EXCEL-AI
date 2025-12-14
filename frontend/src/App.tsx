@@ -19,8 +19,8 @@ function App() {
   const [forecast, setForecast] = useState<number[]>([]);
   const [token, setToken] = useState("");
   const [insight, setInsight] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("admin");
   const [org, setOrg] = useState("");
   const [role, setRole] = useState("");
 
