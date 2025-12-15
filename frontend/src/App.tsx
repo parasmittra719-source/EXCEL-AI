@@ -6,11 +6,13 @@ import {
   LineElement,
   CategoryScale,
   LinearScale,
-  PointElement
+  PointElement,
+  Tooltip,
+  Legend
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 
-ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement);
+ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000";
 const WS_BASE_URL = API_BASE_URL.replace(/^http/, "ws");
@@ -20,8 +22,8 @@ console.log("Current API Config:", { API_BASE_URL, WS_BASE_URL });
 function App() {
   const [rows, setRows] = useState<any[]>([]);
   const [cols, setCols] = useState<string[]>([]);
-  const [target, setTarget] = useState("");
-  const [forecast, setForecast] = useState<number[]>([]);
+  const [targets, setTargets] = useState<string[]>([]);
+  const [forecasts, setForecasts] = useState<Record<string, number[]>>({});
   const [token, setToken] = useState("");
   const [insight, setInsight] = useState("");
   const [username, setUsername] = useState("admin");
@@ -29,10 +31,42 @@ function App() {
   const [org, setOrg] = useState("");
   const [role, setRole] = useState("");
 
+  // Auto-Analyze when forecast updates
+  useEffect(() => {
+    if (Object.keys(forecasts).length > 0) {
+      askAI();
+    }
+  }, [forecasts]);
+
   const askAI = async () => {
-    const res = await axios.post(`${API_BASE_URL}/insight`, { data: rows });
-    setInsight(res.data.insight);
+    // Fix: Send 'forecasts' instead of raw 'rows' for better context
+    const payload = {
+      data: Object.keys(forecasts).map(k => ({ metric: k, values: forecasts[k] }))
+    };
+    try {
+      const res = await axios.post(`${API_BASE_URL}/insight`, payload);
+      setInsight(res.data.insight);
+    } catch (e) {
+      console.error("AI Analysis failed", e);
+    }
   };
+
+  // Calculate Live Stats
+  const calculateStats = () => {
+    if (!Object.keys(forecasts).length) return null;
+
+    // Aggregate across all metrics
+    const stats = Object.entries(forecasts).map(([key, values]) => {
+      const start = values[0];
+      const end = values[values.length - 1];
+      const growth = ((end - start) / start) * 100;
+      const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      return { key, growth: growth.toFixed(1), avg: avg.toFixed(1), end: end.toFixed(0) };
+    });
+    return stats;
+  };
+
+  const liveStats = calculateStats();
 
   const doLogin = async () => {
     try {
@@ -66,7 +100,7 @@ function App() {
   // Real-time Refresh via Websocket
   useEffect(() => {
     // Only connect if we have data to refresh
-    if (!rows.length || !target) return;
+    if (!rows.length || !targets.length) return;
 
     console.log("Connecting to WebSocket...");
     const ws = new WebSocket(`${WS_BASE_URL}/ws`);
@@ -84,7 +118,7 @@ function App() {
       console.log("Closing WebSocket...");
       ws.close();
     };
-  }, [rows, target]); // Re-connect if data changes (simple approach)
+  }, [rows, targets]); // Re-connect if data changes (simple approach)
 
   const upload = (e: any) => {
     const reader = new FileReader();
@@ -100,14 +134,15 @@ function App() {
           return typeof val === 'number';
         });
         setCols(numericKeys);
+        setTargets(numericKeys); // Auto-select all numeric columns for intelligent default
       }
     };
     reader.readAsBinaryString(e.target.files[0]);
   };
 
   const runForecast = async () => {
-    if (!target || target === "Select Metric") {
-      alert("Please select a valid Target Metric column.");
+    if (!targets.length) {
+      alert("Please select at least one numeric metric.");
       return;
     }
 
@@ -119,15 +154,25 @@ function App() {
     try {
       const res = await axios.post(`${API_BASE_URL}/forecast`, {
         rows,
-        target
+        targets
       });
-      setForecast(res.data.forecast);
+      setForecasts(res.data.forecasts);
     } catch (e: any) {
       console.error(e);
       const msg = e.response?.data?.detail || e.message || "Unknown error";
       alert(`Forecast failed: ${msg}`);
     }
   };
+
+  const toggleTarget = (col: string) => {
+    if (targets.includes(col)) {
+      setTargets(targets.filter(t => t !== col));
+    } else {
+      setTargets([...targets, col]);
+    }
+  };
+
+  const colors = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 
 
   if (!token) {
@@ -215,6 +260,24 @@ function App() {
                 <span className="w-2 h-8 bg-indigo-500 rounded mr-3"></span>
                 Data Controls
               </h3>
+
+              {/* Live Stats Board */}
+              {liveStats && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {liveStats.map(s => (
+                    <div key={s.key} className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                      <div className="text-xs text-indigo-500 uppercase font-bold">{s.key} Growth</div>
+                      <div className={`text-xl font-bold ${Number(s.growth) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {Number(s.growth) >= 0 ? '+' : ''}{s.growth}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Avg: {s.avg} | Final: {s.end}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                 <div className="w-full">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Upload Dataset (CSV)</label>
@@ -225,20 +288,24 @@ function App() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Target Metric</label>
-                  <select
-                    onChange={e => setTarget(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                  >
-                    <option>Select Metric</option>
-                    {cols.map(c => <option key={c}>{c}</option>)}
-                  </select>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Metrics to Analyze</label>
+                  <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                    {cols.length > 0 ? cols.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => toggleTarget(c)}
+                        className={`text-xs px-2 py-1 rounded-full border ${targets.includes(c) ? 'bg-indigo-100 border-indigo-500 text-indigo-700 font-semibold' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                      >
+                        {c}
+                      </button>
+                    )) : <span className="text-sm text-gray-400">Upload data first</span>}
+                  </div>
                 </div>
                 <div>
                   <button
                     onClick={runForecast}
-                    disabled={!rows.length || !target}
-                    className={`w-full py-2.5 px-6 rounded-lg text-white font-medium transition-all shadow-md ${(!rows.length || !target) ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg'}`}
+                    disabled={!rows.length || !targets.length}
+                    className={`w-full py-2.5 px-6 rounded-lg text-white font-medium transition-all shadow-md ${(!rows.length || !targets.length) ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-lg'}`}
                   >
                     Generate Forecast
                   </button>
@@ -253,29 +320,26 @@ function App() {
                 Forecast Visualization
               </h3>
               <div className="flex-1 relative">
-                {forecast.length > 0 ? (
+                {Object.keys(forecasts).length > 0 ? (
                   <Line
                     data={{
-                      labels: forecast.map((_, i) => `Month ${i + 1}`),
-                      datasets: [
-                        {
-                          label: "Predicted Growth",
-                          data: forecast,
-                          borderColor: "#4f46e5",
-                          backgroundColor: "rgba(79, 70, 229, 0.1)",
-                          borderWidth: 3,
-                          pointBackgroundColor: "#ffffff",
-                          pointBorderColor: "#4f46e5",
-                          pointRadius: 4,
-                          tension: 0.4,
-                          fill: true
-                        },
-                      ],
+                      labels: Object.values(forecasts)[0].map((_, i) => `Month ${i + 1}`),
+                      datasets: Object.keys(forecasts).map((key, idx) => ({
+                        label: key,
+                        data: forecasts[key],
+                        borderColor: colors[idx % colors.length],
+                        backgroundColor: `${colors[idx % colors.length]}20`, // 20% opacity
+                        borderWidth: 2,
+                        pointBackgroundColor: "#ffffff",
+                        pointBorderColor: colors[idx % colors.length],
+                        pointRadius: 4,
+                        tension: 0.4,
+                      }))
                     }}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
+                      plugins: { legend: { display: true, position: 'top' } },
                       scales: {
                         y: { grid: { color: "#f3f4f6" }, border: { display: false } },
                         x: { grid: { display: false }, border: { display: false } }
@@ -285,7 +349,7 @@ function App() {
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
                     <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    <span>No data available. Run a forecast to compare.</span>
+                    <span>No forecast generated. Upload data and click Generate.</span>
                   </div>
                 )}
               </div>

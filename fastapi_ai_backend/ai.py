@@ -12,8 +12,8 @@ def generate_insight(data):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # Use Stable Flash model (usually 1.5-flash)
-            model = genai.GenerativeModel('gemini-flash-latest')
+            # Use Gemini 1.5 Flash 8B (fastest/cheapest)
+            model = genai.GenerativeModel('gemini-1.5-flash-8b')
             prompt = f"Analyze this business data and provide 3 concise key insights:\n{data}"
             response = model.generate_content(prompt)
             return response.text

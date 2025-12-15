@@ -25,35 +25,45 @@ def health():
 def forecast(data: dict):
     try:
         df = pd.DataFrame(data["rows"])
-        target = data["target"]
-
-        if target not in df.columns:
-            raise HTTPException(status_code=400, detail=f"Target column '{target}' not found in dataset.")
-
-        # Basic data validation
-        if not pd.api.types.is_numeric_dtype(df[target]):
-             raise HTTPException(status_code=400, detail=f"Target column '{target}' must contain numeric values.")
-
-        df["index"] = range(len(df))
-        X = df[["index"]]
-        y = df[target]
+        targets = data.get("targets", [])
         
-        # Handle NaN values
-        if df[target].isnull().any():
-             df = df.dropna(subset=[target])
-             X = df[["index"]]
-             y = df[target]
+        # Backward compatibility for single target
+        if "target" in data and not targets:
+            targets = [data["target"]]
 
-        if len(df) < 2:
-             raise HTTPException(status_code=400, detail="Not enough data points to forecast (need at least 2).")
+        if not targets:
+            raise HTTPException(status_code=400, detail="No target columns provided.")
 
-        model = LinearRegression()
-        model.fit(X, y)
-
+        forecasts = {}
+        
+        df["index"] = range(len(df))
         future = [[i] for i in range(len(df), len(df)+6)]
-        preds = model.predict(future)
 
-        return {"forecast": preds.tolist()}
+        for target in targets:
+            if target not in df.columns:
+                continue # Skip invalid columns
+            
+            # Data validation per column
+            if not pd.api.types.is_numeric_dtype(df[target]):
+                continue
+
+            # Prepare data
+            sub_df = df[["index", target]].dropna()
+            if len(sub_df) < 2:
+                continue
+
+            X = sub_df[["index"]]
+            y = sub_df[target]
+
+            model = LinearRegression()
+            model.fit(X, y)
+            preds = model.predict(future)
+            forecasts[target] = preds.tolist()
+
+        if not forecasts:
+             raise HTTPException(status_code=400, detail="Could not generate forecast for any of the selected columns.")
+
+        return {"forecasts": forecasts}
     except Exception as e:
         print(f"Forecast Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
