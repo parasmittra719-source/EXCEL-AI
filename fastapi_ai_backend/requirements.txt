@@ -5,7 +5,7 @@ scikit-learn
 python-multipart
 python-jose
 passlib[bcrypt]
-openai
+google-generativeai
 psycopg2-binary
 sqlalchemy
 fastapi-mail
