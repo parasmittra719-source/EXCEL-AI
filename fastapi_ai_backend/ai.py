@@ -14,4 +14,4 @@ def generate_insight(data):
         return response.text
     except Exception as e:
         print(f"Gemini Error: {e}")
-        return "Could not generate insight. Check API Key."
+        return f"AI Error: {str(e)}"

@@ -93,7 +93,14 @@ function App() {
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(sheet) as any[];
       setRows(data);
-      setCols(Object.keys(data[0]));
+      if (data.length > 0) {
+        // Only show numeric columns for forecasting
+        const numericKeys = Object.keys(data[0]).filter(key => {
+          const val = data[0][key];
+          return typeof val === 'number';
+        });
+        setCols(numericKeys);
+      }
     };
     reader.readAsBinaryString(e.target.files[0]);
   };
@@ -167,10 +174,16 @@ function App() {
           <div className="flex items-center px-4 py-2 bg-indigo-800 rounded-md text-gray-100 cursor-pointer">
             Analytics
           </div>
-          <div className="flex items-center px-4 py-2 hover:bg-indigo-700 rounded-md text-gray-300 cursor-pointer">
+          <div
+            onClick={() => alert("Reports module coming soon!")}
+            className="flex items-center px-4 py-2 hover:bg-indigo-700 rounded-md text-gray-300 cursor-pointer"
+          >
             Reports
           </div>
-          <div className="flex items-center px-4 py-2 hover:bg-indigo-700 rounded-md text-gray-300 cursor-pointer">
+          <div
+            onClick={() => alert("Settings module coming soon!")}
+            className="flex items-center px-4 py-2 hover:bg-indigo-700 rounded-md text-gray-300 cursor-pointer"
+          >
             Settings
           </div>
         </nav>
